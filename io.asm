@@ -1,3 +1,5 @@
+BITS 64
+
 extern GetStdHandle
 extern ExitProcess
 extern WriteFile
@@ -26,72 +28,76 @@ export exit
 ;arguments are taken from last to first off the stack
 
 _main:
-	;push msg
+	and sp, 11110000b
+	;mov rcx, msg
 	;call print
 
-	push input_size
-	push input_buffer
+	mov rdx, input_size
+	mov rcx, input_buffer
 	call input
 
-	push input_buffer
+	mov rcx, input_buffer
 	call print
 
 exit:
-	push 0
+	mov rcx, 0
 	call ExitProcess
 
 print:
-	push ebp
-	mov ebp, esp  ; where we're starting
-
-	; we know the msg is in memory, and the address is passed in the call stack
-	mov edx, [esp+8]		; start address of msg, 8 bytes past ebp which we do not want to touch until the end
-	mov ecx, -1
+	; rcx is message ptr
+	mov rdx, rcx
+	; use r8 as counter for finding len of buffer
+	or r8, -1
 
 	_loop:
-		inc ecx
-		cmp byte [edx + ecx], byte 0  ; compare char to 0
+		inc r8
+		cmp byte [rdx + r8], byte 0  ; compare char to 0
 		jne _loop
 
 	; get stdout
-	push -11
+	mov rcx, -11  ; stdout
+	sub rsp, 4 ; shadow space?
 	call GetStdHandle  ; now it's in eax
-	add esp, 4
+	add rsp, 4
 
 	; write
-	push 0
-	push 0 ; n bytes written
-	push ecx	; len
-	push edx	; str
-	push eax	; stdout
+	mov r9, _bytes_out ; bytes written
+	; r8 already holds len
+	; rdx already holds ptr
+	mov rcx, rax ; stdout
+	sub rsp, 4
 	call WriteFile
-	add esp, 20
+	add rsp, 4
 
-	mov esp, ebp
-	pop ebp
 	ret
 
-input:
-	push ebp
-	mov ebp, esp
 
-	mov ecx, [esp+8]		; buffer in
-	mov edx, [esp+12]		; max bytes - should be size of buffer
-	dec edx		; max bytes actually needs to be 1 less so we can ensure a terminating 0
+input:
+	; rcx buffer in
+	; rdx max bytes - should be size of buffer
+	dec rdx		; max bytes actually needs to be 1 less so we can ensure a terminating 0
+	mov r8, rcx
 
 	; get stdin
-	push -10
-	call GetStdHandle  ; now it's in eax
-	add esp, 4
+	mov rcx, -10
+	sub rsp, 4
+	call GetStdHandle  ; now it's in rax
+	add rsp, 4
 
-	push 0 ; you don't want this one
-	push _bytes_in ; n bytes read
-	push edx	; max bytes
-	push ecx	; buffer
-	push eax	; stdin
+	; rdx has max bytes
+	; r8 has buffer pointer
+	; rax has stdin
+	mov rcx, rax ; give rcx stdin
+	mov r9, r8 ; give r9 the buffer temporarily
+	mov r8, rdx ; give r8 the max bytes
+	mov rdx, r9 ; give rdx the buffer
+
+	mov r9, _bytes_in ; n bytes read
+	; r8 has max bytes
+	; rdx has buffer
+	; rcx has stdin
+	sub rsp, 4
 	call ReadFile
-	add esp, 20
+	add rsp, 4
 
-	mov esp, ebp
-	pop ebp
 	ret

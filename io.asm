@@ -56,18 +56,18 @@ print:
 
 	; get stdout
 	mov rcx, -11  ; stdout
-	sub rsp, 4 ; shadow space?
+	sub rsp, 32 ; shadow space?
 	call GetStdHandle  ; now it's in eax
-	add rsp, 4
+	add rsp, 32
 
 	; write
 	mov r9, _bytes_out ; bytes written
 	; r8 already holds len
 	; rdx already holds ptr
 	mov rcx, rax ; stdout
-	sub rsp, 4
+	sub rsp, 32
 	call WriteFile
-	add rsp, 4
+	add rsp, 32
 
 	ret
 
@@ -80,9 +80,9 @@ input:
 
 	; get stdin
 	mov rcx, -10
-	sub rsp, 4
+	sub rsp, 32
 	call GetStdHandle  ; now it's in rax
-	add rsp, 4
+	add rsp, 32
 
 	; rdx has max bytes
 	; r8 has buffer pointer
@@ -96,8 +96,8 @@ input:
 	; r8 has max bytes
 	; rdx has buffer
 	; rcx has stdin
-	sub rsp, 4
+	sub rsp, 32
 	call ReadFile
-	add rsp, 4
+	add rsp, 32
 
 	ret

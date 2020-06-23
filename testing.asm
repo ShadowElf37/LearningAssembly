@@ -3,8 +3,8 @@ extern input
 extern exit
 
 extern malloc
-extern realloc
 extern free
+extern memcopy
 
 %define STOFF(x) 8*x
 
@@ -36,6 +36,7 @@ _main:
 	mov rcx, rax
 	call array.append
 
+	add rax, 16
 	mov rcx, rax
 	call print
 
@@ -44,17 +45,19 @@ _main:
 
 array:
 .new:
-	mov rdx, rcx
-	; rdx will contain size of new elements
+	push rcx
+	; rcx will contain size of new elements
 	; SHOULD ONLY BE 1,2,4,8
 
-	mov rcx, 2
-	sub rsp, 4
+	mov rcx, 16 ; 8+8 bytes for len and elem size
+	sub rsp, 32
 	call malloc
-	add rsp, 4
+	add rsp, 32
+
+	pop rcx
 
 	mov qword [rax], qword 0  ; we are going to store the length of the array in the first byte
-	mov qword [rax+8], qword rdx
+	mov qword [rax+8], qword rcx
 
 	ret
 
@@ -64,39 +67,57 @@ array:
 
 	; rcx = ptr
 	; rdx = item to push
+	
+	mov r9, qword [rcx+10q] ; elem size
+	mov r8, r9		; +new elem
+	mov rax, qword [rcx]  ; length in items
 	push rdx
-	
-	mov r9, [rcx+8] ; elem size
-	mov r8, r9
-	add r8, 8		; we need to malloc 8 for real len and [r9] for new item
-	mov rax, [rcx] ;  length in items
 	mul r9			; multiply by item size
-	add r8, rax	; how long the array is in bytes		
+	pop rdx
+	add r8, 16		; +we need to malloc 8+8 for real len
+	add r8, rax		; +how long the array is in bytes without new elem		
 	
-	push rax
+	; RECAP
+	; r9 = elem size
+	; r8 = actual array size in bytes + new elem
+	; rdx = new data to push
+	; rcx = old array ptr
+
+	push rcx
+	mov rcx, r8
+	sub r8, r9  ; r8 is actually ahead by one elem-size for the rest of our purposes, and now that it's in rcx for malloc, we can sub
 	push r9
 	push r8
 	push rdx
-	mov rdx, r8
-	; rcx is already ptr, rdx is new len
-	sub rsp, 4
-	call realloc
-	add rsp, 4
+	; rcx contains total bytes of new array, for malloc
+	sub rsp, 32
+	call malloc
+	add rsp, 32
+
+	; memcpy(*old, *new, size)
+	; rcx needs old
+	; rdx needs new
+	; r8 needs size to copy, specifically of the old, which it should have?
+	mov rcx, qword [rsp+30q]
+	mov rdx, rax
+	mov r8, qword [rsp+10q]
+	push rax
+	call memcopy
+	pop rax
+	pop rdx
 	pop r8
 	pop r9
 	pop rcx
 
-	pop rdx
+	; RECAP
+	; r9 = elem size
+	; r8 = actual array size in bytes + new elem size
+	; rdx = new data to push
+	; rcx = old array ptr
+	; rax = new array ptr
 
-	sub r8, 8
-	; quick recap:
-	;  rax = new array
-	;  rcx = new array len in items
-	;  rdx = new item
-	;  r8 = new array size in bytes
-	;  r9 = elem size
-
-	mov [rax], rcx
+	inc qword [rax]
+	; increase recorded length by 1
 
 	; now we get that new and shiny array item
 	cmp r9, 1
@@ -110,12 +131,22 @@ array:
 
 	.size1:
 		mov byte [rax + r8], byte dl
+		jmp .end
 	.size2:
 		mov word [rax + r8], word dx
+		jmp .end
 	.size4:
 		mov dword [rax + r8], dword edx
+		jmp .end
 	.size8:
 		mov qword [rax + r8], qword rdx
+	.end:
+
+	push rax
+	sub rsp, 32
+	call free
+	add rsp, 32
+	pop rax
 
 	mov rsp, rbp
 	pop rbp

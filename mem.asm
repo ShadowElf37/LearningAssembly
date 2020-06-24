@@ -13,72 +13,28 @@ memcopy:
 
 	mov rdi, rdx
 	mov rsi, rcx
-	mov rcx, r8
 
-	rep movsb
-	ret
+	cmp r8, 8
+	jl .just_resolve_odd_bound
 
-_realloc:
-	; rdx size
-	; rcx ptr
+	xor rdx, rdx
+	mov rax, r8
+	mov r9, 8
+	div r9
 
-	push rbp
-	mov rbp, rsp
+	; rdx has remainder
+	; movsq until we hit the odd bound, so for all rax
 
-	mov rsi, rcx
-	mov rcx, rdx
+	mov rcx, rax
+	rep movsq
 
-	push rcx
-	sub rsp, 32
-	call malloc
-	add rsp, 32
-	pop rcx
-
-	mov rdi, rax
-	; rsi now has old loc ptr
-	; rdi now has new loc ptr
-	; rcx got the mem size in bytes from rdx
-
-	; optimize the memcopy so it can copy in increments aligned with the memory boundary
-	mov rdx, rcx
-	test dl, 11111110b
-	jz .mb
-	test dl, 11111101b
-	jz .mw
-	test dl, 11111011b
-	jz .md
-	test dl, 11110111b
-	jz .mq
-
-	; it is guaranteed that no information is destroyed in the bitshifts
-	.mb:
+	jmp .resolve_odd_bound
+	.just_resolve_odd_bound:
+		mov rcx, r8
+		jmp .copy_odd_bound
+	.resolve_odd_bound:
+		mov rcx, rdx
+	.copy_odd_bound:
+		; now we'll just movsb the rest of it
 		rep movsb
-		jmp .end
-	.mw:
-		shr rcx, 1
-		rep movsw
-		shl rcx, 1
-		jmp .end
-	.md:
-		shr rcx, 2
-		rep movsd
-		shl rcx, 2
-		jmp .end
-	.mq:
-		shr rcx, 4
-		rep movsq
-		shl rcx, 4
-		jmp .end
-	.end:
-
-	push rax
-	sub rsi, rdx  ; rsi gets offset by rdx as mov happens
-	mov rcx, rsi
-	sub rsp, 32
-	call free
-	add rsp, 32
-	pop rax
-
-	mov rsp, rbp
-	pop rbp
 	ret

@@ -48,6 +48,17 @@ array:
 	push rcx
 	; rcx will contain size of new elements
 	; SHOULD ONLY BE 1,2,4,8
+	cmp rcx, 1
+	je .good
+	cmp rcx, 2
+	je .good
+	cmp rcx, 4
+	je .good
+	cmp rcx, 8
+	je .good
+	mov rax, 0
+	ret
+	.good:
 
 	mov rcx, 16 ; 8+8 bytes for len and elem size
 	sub rsp, 32
@@ -58,6 +69,56 @@ array:
 
 	mov qword [rax], qword 0  ; we are going to store the length of the array in the first byte
 	mov qword [rax+8], qword rcx
+
+	ret
+
+.get:
+	; rcx ptr
+	; rdx index
+	cmp rdx, [rcx]  ; not outside length bounds
+	jl .good
+	cmp rdx, 0
+	jl .good
+	mov rax, -1
+	ret
+	.good:
+	mov r8, qword [rcx+8]
+	mov rax, [rcx+16+r8*rdx]
+	ret
+
+.set:
+	; rcx ptr
+	; rdx index
+	; r8 item
+	cmp rdx, [rcx]  ; not outside length bounds
+	jge .bad
+	cmp rdx, 0
+	jge .good
+	.bad:
+	mov rax, -1
+	ret
+
+	.good:
+	mov r9, qword [rcx+8]
+
+	cmp r9, 1
+	je .size1
+	cmp r9, 2
+	je .size2
+	cmp r9, 4
+	je .size4
+	cmp r9, 8
+	je .size8
+
+	mov rax, r8
+	.size1:
+		mov byte [rcx+16+1*rdx], byte al
+	.size2:
+		mov word [rcx+16+2*rdx], word ax
+	.size4:
+		mov dword [rcx+16+4*rdx], dword eax
+	.size8:
+		mov qword [rcx+16+8*rdx], qword rax
 
 	ret
 
